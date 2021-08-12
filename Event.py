@@ -26,7 +26,7 @@ class Event:
                 try:
                     self.expire = datetime.strptime(" ".join(args[arg]), "%m/%d/%Y %H:%M")
                 except:
-                    args["expire"] = datetime.now() + timedelta(days = DEFAULT_EXPIRE)
+                    args["expire"] = datetime.strftime(datetime.now() + timedelta(days = DEFAULT_EXPIRE), "%m/%d/%Y %H:%M")
                     self.expire = args["expire"]
         
         for member in self.rsvp_list:
@@ -46,11 +46,13 @@ class Event:
 
             else:
                 demoji = emoji.demojize(str(reaction[0]))
-                if demoji in [":check_mark_button:", ":cross_mark:"]:
+                if demoji in [":check_mark_button:", ":cross_mark:", ":red_exclamation_mark:"]:
                     if demoji == ":check_mark_button:":
                         self.status[reaction[1]] = "white_check_mark"
                     elif demoji == ":cross_mark:":
                         self.status[reaction[1]] = "x"
+                    elif demoji == ":red_exclamation_mark:":
+                        self.status[reaction[1]] = "exclamation"
         
         
         await self.message.edit(content=self.CreateString())
@@ -66,7 +68,6 @@ class Event:
         sendString += "----------------------------------\n"
         for arg in self.args:
             if arg == "message": #User is adding a message
-                print("Adding a message")
                 sendString += "**" + " ".join(self.args[arg]) + "**\n" #Append any message, such as "Climbing at ET on Saturday 0900"
 
             elif arg == "req": #User is requesting certain users or groups to be pinged
@@ -79,13 +80,12 @@ class Event:
         return sendString
     
     def JsonDump(self):
-        dictionary = {
-            self.id: {
-                "guild_id": self.ctx.guild.id,
-                "channel_id": self.ctx.channel.id,
-                "message_id": self.message.id,
-                "author_id": self.author.id,
-                "args": self.args,
-            }
-        }
-        return dictionary
+        dictionary = { "guild_id": self.ctx.guild.id, 
+                       "channel_id": self.ctx.channel.id, 
+                       "message_id": self.message.id, 
+                       "author_id": self.author.id, 
+                       "args": self.args
+                    }
+
+        string = f"{self.id}: {dictionary}"
+        return string

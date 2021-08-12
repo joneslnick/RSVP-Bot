@@ -5,6 +5,7 @@ from discord.utils import get
 from Event import Event
 import emoji
 from datetime import datetime
+import asyncio
 
 
 
@@ -25,7 +26,7 @@ class ExpireCog(commands.Cog):
         self.bot = bot
         self.CheckTimeout.start()
     
-    @tasks.loop(seconds=60)
+    @tasks.loop(minutes=5)
     async def CheckTimeout(self):
         global EVENTS
 
@@ -40,6 +41,7 @@ class ExpireCog(commands.Cog):
 async def on_ready():
     print(f"Logged in as {BOT.user.name}")
     await Import(LOG_FILE)
+    await asyncio.sleep(60)
     ExpireCog(BOT)
 
 @BOT.command(name="rsvp", pass_context=True)
@@ -64,11 +66,10 @@ async def on_raw_reaction_add(payload):
     reaction = get(msg.reactions, emoji=payload.emoji.name)
     user = payload.member
     
-    print(reaction, user)
     if (user and reaction):
         for event in EVENTS:
             if event.message.id == msg.id: #Reaction was added to a valid comp event
-                print(f"User {user} has reacted with {payload.emoji}")
+                print(f"User {user} has reacted with {payload.emoji.name}")
                 event.reactions.append((reaction,user)) #Add reaction to list of reactions for specific event
                 
             await event.ProcessReactions()
@@ -88,10 +89,9 @@ async def on_raw_reaction_remove(payload):
     if user is not None:
         for event in EVENTS:
             if event.message.id == msg.id: #Reaction was removed from a valid comp event
-                print(f"User {user} has removed their reaction of {payload.emoji}")
+                print(f"User {user} has removed their reaction of {payload.emoji.name}")
                 for react in event.reactions:
                     if emoji.demojize(str(react[0])) == emoji.demojize(payload.emoji.name) and react[1] == user:
-                        print("Removed a Reaction")
                         event.reactions.remove(react) #Remove reaction from reaction list
                         event.status[user] = "grey_question" #Until reprocessed, assume the user removed all roles
 
@@ -126,19 +126,28 @@ def RetrieveToken():
     return token
 
 def Export(fileName):
-    jsonString = ""
-
     with open(fileName, "w") as f:
+        output = "{"
+        numEvents = len(EVENTS)
+        eventCounter = 0
         for event in EVENTS:
-            json.dump(event.JsonDump(), f)
-    print("Completed exporting to file.")
+            eventCounter += 1
+            #output += event.JsonDump()
+            output += f'"{event.id}":{{"guild_id": {event.ctx.guild.id}, "channel_id": {event.ctx.channel.id}, "message_id": {event.message.id}, "author_id": {event.author.id}, "args": {json.dumps(event.args)}}}'
+            if eventCounter != numEvents: #Need a comma delimiter
+                output += ", "
+        output += "}"
+        f.write(output)
+        #json.dump(output, f)
+    print("Completed export to file.")
 
 async def Import(fileName):
     global EVENTS
-    EVENTS.clear()
+
 
     try:
         with open(fileName, "r") as f:
+            EVENTS.clear()
             jsonString = json.load(f)
 
             for event in jsonString:
@@ -170,7 +179,7 @@ async def Import(fileName):
     except FileNotFoundError:
         pass
     except JSONDecodeError:
-        pass
+        raise
 
     print("Completed import from file.")
 
